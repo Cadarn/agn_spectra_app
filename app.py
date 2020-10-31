@@ -10,6 +10,14 @@ from data_functions import generate_spectra
 
 DEGREE_SYMBOL = "\N{DEGREE SIGN}"
 
+# Incorporating the nre config functions
+st.set_page_config(
+    page_title="AGN X-ray Spectral Modeller",
+    page_icon="🌌",
+    layout="centered",
+    initial_sidebar_state="auto"
+)
+
 st.sidebar.title("AGN Spectral Model Simulator")
 
 # Schematic info

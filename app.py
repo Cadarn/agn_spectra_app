@@ -19,6 +19,7 @@ TODO:
 - plotly background colour
 - streamlit location of sections on screen (i.e. margins etc)
 - alternative to PyXspec?
+- how to do a step plot
 """
 # ## NOTE adding this here instead of in separate module so that it is loaded once - is this correct?
 
@@ -183,19 +184,17 @@ Xset.cosmo = "67.3,,0.685"
 Plot.device = "/null"
 Fit.query = "yes"
 
-mainModel = "constant*TBabs(atable{/Users/pboorman/Dropbox/data/xspec/models/borus/var_Fe/borus02_v170323b.fits} + zTBabs*cabs*cutoffpl + constant*cutoffpl)"
-
 def dummy():
     AllData.dummyrsp(lowE = 1.e-3, highE = 2.e2, nBins = 10 ** 3, scaleType = "log")
     Plot("model")
-m = Model(mainModel)
-dummy()
-          
-def set_default_values(save = False):
-    """
-    Set default values for the model being stepped over
-    """
-    ## note the norms must be independent and not tied
+      
+def generate_borus02_spectra(PhoIndex, Ecut, A_Fe, factor, logNHtor, CFtor, thInc):##, z
+    
+    mainModel = "constant*TBabs(atable{/Users/pboorman/Dropbox/data/xspec/models/borus/var_Fe/borus02_v170323b.fits} + zTBabs*cabs*cutoffpl + constant*cutoffpl)"
+    m = Model(mainModel)
+    dummy()
+
+    ## set default values
     AllModels(1)(1).values = 1., -1.
     AllModels(1)(2).values = 0.01, -1.
     AllModels(1)(3).values = 1.9 ## VARIABLE
@@ -217,9 +216,157 @@ def set_default_values(save = False):
     AllModels(1)(19).link = "p4"
     AllModels(1)(20).values = 1. ## SCATT norm
     AllModels.show()
-      
-def generate_spectra(PhoIndex, Ecut, A_Fe, factor, logNHtor, CFtor, thInc):##, z
+
+    wdata = pd.DataFrame(data = {"E_keV": Plot.x()})
     
+    AllModels(1)(3).values = PhoIndex
+    AllModels(1)(4).values = Ecut
+    AllModels(1)(5).values = logNHtor
+    AllModels(1)(6).values = CFtor
+    AllModels(1)(7).values = thInc
+    AllModels(1)(8).values = A_Fe
+    # AllModels(1)(9).values = z
+    AllModels(1)(17).values = factor
+
+    # Plot("eemodel")
+    # pardf_name = "Total"
+    # wdata.loc[:, pardf_name] = Plot.model()
+    
+    REPR_norm = AllModels(1)(10).values[0]
+    TRANS_norm = AllModels(1)(16).values[0]
+    SCATT_norm = AllModels(1)(20).values[0]
+
+    AllModels(1)(10).values = 0.
+    AllModels(1)(20).values = 0.
+    Plot("eemodel")
+    pardf_name = "Transmitted"
+    wdata.loc[:, pardf_name] = Plot.model()
+    AllModels(1)(10).values = REPR_norm
+    AllModels(1)(20).values = SCATT_norm
+    
+    AllModels(1)(16).values = 0.
+    AllModels(1)(20).values = 0.
+    Plot("eemodel")
+    pardf_name = "Reprocessed"
+    wdata.loc[:, pardf_name] = Plot.model()
+    AllModels(1)(16).values = TRANS_norm
+    AllModels(1)(20).values = SCATT_norm
+    
+    AllModels(1)(10).values = 0.
+    AllModels(1)(16).values = 0.
+    Plot("eemodel")
+    pardf_name = "Scattered"
+    wdata.loc[:, pardf_name] = Plot.model()
+
+    wdata.loc[:, "Total"] = wdata[["Transmitted", "Reprocessed", "Scattered"]].sum(axis = 1)
+    ## only needed if we were going to do something else with the model...
+    # AllModels(1)(10).values = REPR_norm
+    # AllModels(1)(16).values = TRANS_norm
+    return wdata
+
+def generate_pexrav_spectra(PhoIndex, Ecut, A_Fe, factor, logNHtor, CFtor, thInc):##, z
+    model  constant*TBabs(zTBabs*cabs*cutoffpl + pexrav + constant*cutoffpl)
+              1         -1          0          0      1e+10      1e+10
+           0.01         -1          0          0     100000      1e+06
+              1      0.001          0          0     100000      1e+06
+              0      -0.01     -0.999     -0.999         10         10
+= p3
+            1.9       0.01         -3         -2          9         10
+            300         -1       0.01          1        500        500
+          1e-05       0.01          0          0      1e+20      1e+24
+= p6
+= p7
+           -0.1       0.01      -1000      -1000     -0.001     -0.001
+              0      -0.01     -0.999     -0.999         10         10
+              1      -0.01          0          0      1e+06      1e+06
+              1      -0.01          0          0      1e+06      1e+06
+           0.45      -0.01       0.05       0.05       0.95       0.95
+= p8
+          0.001       0.01      1e-05      1e-05        0.1        0.1
+= p9
+= p10
+= p8
+bayes off
+
+    mainModel = "constant*TBabs(zTBabs*cabs*cutoffpl + pexrav + constant*cutoffpl)"
+    m = Model(mainModel)
+    dummy()
+    AllModels(1)(1).values = 1., -1.
+    AllModels(1)(2).values = 0.01, -1.
+    AllModels(1)(3).values = 1. ## nHe22
+    AllModels(1)(4).values = 0. ## redshift
+    AllModels(1)(5).link = "p3"
+    AllModels(1)(6).values = 1.9 ## VARIABLE
+    AllModels(1)(7).values = 300. ## VARIABLE
+    AllModels(1)(8).values = 1. ## TRANS norm
+    AllModels(1)(9).values = 0. ## redshift
+    AllModels(1)(10).values = 1. ## REPR norm
+    AllModels(1)(11).link = "10.^(p5 - 22.)"
+    AllModels(1)(12).link = "p9"
+    AllModels(1)(13).link = "p11"
+    AllModels(1)(14).link = "p3"
+    AllModels(1)(15).link = "p4"
+    AllModels(1)(16).values = 1. ## TRANS norm
+    AllModels(1)(17).values = 1.e-3 ## VARIABLE
+    AllModels(1)(18).link = "p3"
+    AllModels(1)(19).link = "p4"
+    AllModels(1)(20).values = 1. ## SCATT norm
+
+
+    set_default_values(False)
+    wdata = pd.DataFrame(data = {"E_keV": Plot.x()})
+    
+    AllModels(1)(6).values = PhoIndex
+    AllModels(1)(7).values = Ecut
+    AllModels(1)(3).values = 10 ** (logNHtor - 22.)
+    AllModels(1)(6).values = CFtor
+    AllModels(1)(7).values = thInc
+    AllModels(1)(8).values = A_Fe
+    # AllModels(1)(9).values = z
+    AllModels(1)(17).values = factor
+
+    # Plot("eemodel")
+    # pardf_name = "Total"
+    # wdata.loc[:, pardf_name] = Plot.model()
+    
+    REPR_norm = AllModels(1)(10).values[0]
+    TRANS_norm = AllModels(1)(16).values[0]
+    SCATT_norm = AllModels(1)(20).values[0]
+
+    AllModels(1)(10).values = 0.
+    AllModels(1)(20).values = 0.
+    Plot("eemodel")
+    pardf_name = "Transmitted"
+    wdata.loc[:, pardf_name] = Plot.model()
+    AllModels(1)(10).values = REPR_norm
+    AllModels(1)(20).values = SCATT_norm
+    
+    AllModels(1)(16).values = 0.
+    AllModels(1)(20).values = 0.
+    Plot("eemodel")
+    pardf_name = "Reprocessed"
+    wdata.loc[:, pardf_name] = Plot.model()
+    AllModels(1)(16).values = TRANS_norm
+    AllModels(1)(20).values = SCATT_norm
+    
+    AllModels(1)(10).values = 0.
+    AllModels(1)(16).values = 0.
+    Plot("eemodel")
+    pardf_name = "Scattered"
+    wdata.loc[:, pardf_name] = Plot.model()
+
+    wdata.loc[:, "Total"] = wdata[["Transmitted", "Reprocessed", "Scattered"]].sum(axis = 1)
+    ## only needed if we were going to do something else with the model...
+    # AllModels(1)(10).values = REPR_norm
+    # AllModels(1)(16).values = TRANS_norm
+    return wdata
+
+def generate_uxclumpy_spectra(PhoIndex, Ecut, A_Fe, factor, logNHtor, CFtor, thInc):##, z
+    
+    mainModel = "constant*TBabs(atable{/Users/pboorman/Dropbox/data/xspec/models/borus/var_Fe/borus02_v170323b.fits} + zTBabs*cabs*cutoffpl + constant*cutoffpl)"
+    m = Model(mainModel)
+    dummy()
+
     set_default_values(False)
     wdata = pd.DataFrame(data = {"E_keV": Plot.x()})
     
@@ -272,99 +419,237 @@ def generate_spectra(PhoIndex, Ecut, A_Fe, factor, logNHtor, CFtor, thInc):##, z
 
 DEGREE_SYMBOL = "\N{DEGREE SIGN}"
 
+model_choice = st.sidebar.selectbox('Choose a model', ('borus02', 'pexrav', 'uxclumpy'))
+
 st.sidebar.title("Parameters")
 
 # Schematic info
 # st.sidebar.subheader("AGN Geometry")
 # st.sidebar.image("assets/schematic.png", use_column_width=True)
 
-# Controllers
-PhoIndex_c = st.sidebar.slider(
-    "Photon Index (PhoIndex)",
-    min_value=1.45,
-    max_value=2.55,
-    value = 1.8,
-    step=0.1,
-    format="%.1f",
-    key="PhoIndex",
-)
-Ecut_c = st.sidebar.slider(
-    "High-energy cut-off (Ecut)",
-    min_value=100.,
-    max_value=1000.,
-    value = 270.,
-    step=10.,
-    format="%.0f",
-    key="Ecut",
-)
-logNHtor_c = st.sidebar.slider(
-    "logNH (logNHtor)",
-    min_value=22.,
-    max_value=25.5,
-    value = 24.,
-    step=0.1,
-    format="%.1f",
-    key="logNHtor",
-)
-CFtor_c = st.sidebar.slider(
-    "Torus Covering Factor (CFtor)",
-    min_value=0.15,
-    max_value=0.95,
-    value = 0.5,
-    step=0.1,
-    format="%.1f",
-    key="CFtor",
-)
-thInc_c = st.sidebar.slider(
-    "Inclination Angle (thInc)",
-    min_value=20.,
-    max_value=85.0,
-    value = 60.,
-    step=1.,
-    format=f"%.0f{DEGREE_SYMBOL}",
-    key="thInc",
-)
 
-A_Fe_c = st.sidebar.slider(
-    "Iron Abundance (A_Fe)",
-    min_value=0.1,
-    max_value=10.,
-    value = 1.,
-    step=0.1,
-    format="%.1f",
-    key="A_Fe",
-)
-
-# z_c = st.sidebar.slider(
-#     "Redshift",
-#     min_value=1.e-3,
-#     max_value=1.,
-#     value = 0.,
-#     step=0.001,
-#     format="%.3f",
-#     key="z",
-# )
-
-factor_c = st.sidebar.slider(
-    "Scattered Fraction (fscatt)",
-    min_value=1.e-5,
-    max_value=1.e-1,
-    value = 1.e-3,
-    step=1.e-5,
-    format="%.5f",
-    key="factor",
-)
 
 # Add some context in the main window
-st.title("X-ray Simulator")
-st.subheader("${\\tt const}\\times {\\tt TBabs}({\\tt borus02\\_v170323b} + {\\tt zTBabs}\\times {\\tt cabs}\\times {\\tt cutoffpl} + {\\tt fscatt}\\times {\\tt cutoffpl})$")
 
-# generate our data
-df = generate_spectra(PhoIndex_c, Ecut_c, A_Fe_c, factor_c, logNHtor_c, CFtor_c, thInc_c)##, z_c
-mod_df = df.melt(
-    id_vars=["E_keV"], value_vars=["Transmitted", "Reprocessed", "Scattered", "Total"]
-)
-mod_df = mod_df.rename(columns={"variable": "Model Component", "value": "Flux"})
+if model_choice == "borus02":
+    st.title("${\\tt borus02}$ X-ray Simulator")
+    st.subheader("${\\tt const}\\times {\\tt TBabs}({\\tt borus02\\_v170323b} + {\\tt zTBabs}\\times {\\tt cabs}\\times {\\tt cutoffpl} + {\\tt fscatt}\\times {\\tt cutoffpl})$")
+    # Controllers
+    PhoIndex_c = st.sidebar.slider(
+        "Photon Index (PhoIndex)",
+        min_value=1.45,
+        max_value=2.55,
+        value = 1.8,
+        step=0.1,
+        format="%.1f",
+        key="PhoIndex",
+    )
+    Ecut_c = st.sidebar.slider(
+        "High-energy cut-off (Ecut)",
+        min_value=100.,
+        max_value=1000.,
+        value = 270.,
+        step=10.,
+        format="%.0f",
+        key="Ecut",
+    )
+    logNHtor_c = st.sidebar.slider(
+        "logNH (logNHtor)",
+        min_value=22.,
+        max_value=25.5,
+        value = 24.,
+        step=0.1,
+        format="%.1f",
+        key="logNHtor",
+    )
+    CFtor_c = st.sidebar.slider(
+        "Torus Covering Factor (CFtor)",
+        min_value=0.15,
+        max_value=0.95,
+        value = 0.5,
+        step=0.1,
+        format="%.1f",
+        key="CFtor",
+    )
+    thInc_c = st.sidebar.slider(
+        "Inclination Angle (thInc)",
+        min_value=20.,
+        max_value=85.0,
+        value = 60.,
+        step=1.,
+        format=f"%.0f{DEGREE_SYMBOL}",
+        key="thInc",
+    )
+
+    A_Fe_c = st.sidebar.slider(
+        "Iron Abundance (A_Fe)",
+        min_value=0.1,
+        max_value=10.,
+        value = 1.,
+        step=0.1,
+        format="%.1f",
+        key="A_Fe",
+    )
+
+    # z_c = st.sidebar.slider(
+    #     "Redshift",
+    #     min_value=1.e-3,
+    #     max_value=1.,
+    #     value = 0.,
+    #     step=0.001,
+    #     format="%.3f",
+    #     key="z",
+    # )
+
+    factor_c = st.sidebar.slider(
+        "Scattered Fraction (fscatt)",
+        min_value=1.e-5,
+        max_value=1.e-1,
+        value = 1.e-3,
+        step=1.e-5,
+        format="%.5f",
+        key="factor",
+    )
+        # generate our data
+    df = generate_borus02_spectra(PhoIndex_c, Ecut_c, A_Fe_c, factor_c, logNHtor_c, CFtor_c, thInc_c)##, z_c
+    mod_df = df.melt(
+        id_vars=["E_keV"], value_vars=["Transmitted", "Reprocessed", "Scattered", "Total"]
+    )
+    mod_df = mod_df.rename(columns={"variable": "Model Component", "value": "Flux"})
+
+elif model_choice == "pexrav":
+    st.title("${\\tt pexrav}$ X-ray Simulator")
+    st.subheader("${\\tt const} \\times {\\tt TBabs} \\times {\\tt zTBabs}({\\tt pexrav} + {\\tt zTBabs} \\times {\\tt cabs} \\times {\\tt cutoffpl} + {\\tt fscatt} \\times {\\tt cutoffpl})$")
+        # Controllers
+    PhoIndex_c = st.sidebar.slider(
+        "Photon Index (PhoIndex)",
+        min_value=1.45,
+        max_value=2.55,
+        value = 1.8,
+        step=0.1,
+        format="%.1f",
+        key="PhoIndex",
+    )
+    R_c = st.sidebar.slider(
+        "High-energy cut-off (Ecut)",
+        min_value=-100.,
+        max_value=-1.e-1,
+        value = -1.,
+        step=0.1,
+        format="%.0f",
+        key="Ecut",
+    )
+    logNHtor_c = st.sidebar.slider(
+        "logNH",
+        min_value=20.,
+        max_value=26.,
+        value = 23.,
+        step=0.1,
+        format="%.1f",
+        key="logNH",
+    )
+    thInc_c = st.sidebar.slider(
+        "Inclination Angle (thInc)",
+        min_value=20.,
+        max_value=85.0,
+        value = 60.,
+        step=1.,
+        format=f"%.0f{DEGREE_SYMBOL}",
+        key="thInc",
+    )
+
+    factor_c = st.sidebar.slider(
+        "Scattered Fraction (fscatt)",
+        min_value=1.e-5,
+        max_value=1.e-1,
+        value = 1.e-3,
+        step=1.e-5,
+        format="%.5f",
+        key="factor",
+    )
+        # generate our data
+    df = generate_pexrav_spectra(PhoIndex_c, R_c, logNHtor_c, thInc_c, factor_c)##, z_c
+    mod_df = df.melt(
+        id_vars=["E_keV"], value_vars=["Transmitted", "Reprocessed", "Scattered", "Total"]
+    )
+    mod_df = mod_df.rename(columns={"variable": "Model Component", "value": "Flux"})
+
+elif model_choice == "uxclumpy":
+    st.title("${\\tt uxclumpy}$ X-ray Simulator")
+    st.subheader("${\\tt const}\\times {\\tt TBabs}({\\tt uxclumpy\\_reflect} + {\\tt uxclumpy\\_transmit} + {\\tt fscatt} \\times {\\tt uxclumpy\\_omni.fits})$")
+        # Controllers
+    PhoIndex_c = st.sidebar.slider(
+        "Photon Index (PhoIndex)",
+        min_value=1.45,
+        max_value=2.55,
+        value = 1.8,
+        step=0.1,
+        format="%.1f",
+        key="PhoIndex",
+    )
+    Ecut_c = st.sidebar.slider(
+        "High-energy cut-off (Ecut)",
+        min_value=100.,
+        max_value=1000.,
+        value = 270.,
+        step=10.,
+        format="%.0f",
+        key="Ecut",
+    )
+    logNHLOS_c = st.sidebar.slider(
+        "logNH (logNHLOS)",
+        min_value=22.,
+        max_value=25.5,
+        value = 24.,
+        step=0.1,
+        format="%.1f",
+        key="logNHLOS",
+    )
+    theta_tor_c = st.sidebar.slider(
+        "Torus Opening Angle (theta_tor)",
+        min_value=0.15,
+        max_value=0.95,
+        value = 0.5,
+        step=0.1,
+        format="%.1f",
+        key="theta_tor",
+    )
+    thInc_c = st.sidebar.slider(
+        "Inclination Angle (thInc)",
+        min_value=20.,
+        max_value=85.0,
+        value = 60.,
+        step=1.,
+        format=f"%.0f{DEGREE_SYMBOL}",
+        key="thInc",
+    )
+
+    CTKcover_c = st.sidebar.slider(
+        "Compton-thick covering factor (CTKcover)",
+        min_value=0.1,
+        max_value=10.,
+        value = 1.,
+        step=0.1,
+        format="%.1f",
+        key="CTKcover",
+    )
+
+    factor_c = st.sidebar.slider(
+        "Scattered Fraction (fscatt)",
+        min_value=1.e-5,
+        max_value=1.e-1,
+        value = 1.e-3,
+        step=1.e-5,
+        format="%.5f",
+        key="factor",
+    )
+
+    # generate our data
+    df = generate_uxclumpy_spectra(PhoIndex_c, Ecut_c, logNHLOS_c, theta_tor_c, thInc_c, CTKcover_c, factor_c)##, z_c
+    mod_df = df.melt(
+        id_vars=["E_keV"], value_vars=["Transmitted", "Reprocessed", "Scattered", "Total"]
+    )
+    mod_df = mod_df.rename(columns={"variable": "Model Component", "value": "Flux"})
 
 # Construct our plot
 fig = px.line(

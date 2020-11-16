@@ -10,6 +10,16 @@ import pandas as pd
 import numpy as np
 import glob, os
 
+"""
+TODO:
+- select different models
+- dynamic geometry
+- worth pursuing interpolator? (probably not -- just requires user to have PyXspec)
+- plotly tick marks
+- plotly background colour
+- streamlit location of sections on screen (i.e. margins etc)
+- alternative to PyXspec?
+"""
 # ## NOTE adding this here instead of in separate module so that it is loaded once - is this correct?
 
 # # from data_functions import generate_spectra
